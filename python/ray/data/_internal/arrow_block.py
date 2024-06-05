@@ -36,6 +36,11 @@ from ray.data.block import (
 )
 from ray.data.context import DataContext
 
+from gpu_shuffle import gpu_shuffle
+from gpu_shuffle import round_to_n
+import time
+import os
+
 try:
     import pyarrow
 except ImportError:
@@ -251,8 +256,20 @@ class ArrowBlockAccessor(TableBlockAccessor):
         # pressure when there are a large number of small rows. Investigate
         # random shuffling in place to reduce memory pressure.
         # See https://github.com/ray-project/ray/issues/42146.
-        random = np.random.RandomState(random_seed)
-        return self.take(random.permutation(self.num_rows()))
+        print('Using ArrowBlockAccessor.random_shuffle()')
+        if int(os.environ.get('RAY_DATA_GPU_SHUFFLE', '0')):
+            print('Using GPU shuffle implementation')
+            perm = gpu_shuffle(np.arange(self.num_rows()))
+            return self.take(perm)
+        else:
+            print('Using Ray shuffle implementation')
+            t0 = time.perf_counter()
+            random = np.random.RandomState(random_seed)
+            perm = random.permutation(self.num_rows())
+            t1 = time.perf_counter()
+            print(f'Numpy permutation gen time: {round_to_n(t1 - t0, 2)}')
+            return self.take(perm)
+
 
     def schema(self) -> "pyarrow.lib.Schema":
         return self._table.schema

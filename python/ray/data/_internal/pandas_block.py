@@ -203,6 +203,7 @@ class PandasBlockAccessor(TableBlockAccessor):
         return self._table[columns]
 
     def random_shuffle(self, random_seed: Optional[int]) -> "pandas.DataFrame":
+        print('Using PandasBlockAccessor.random_shuffle()')
         table = self._table.sample(frac=1, random_state=random_seed)
         table.reset_index(drop=True, inplace=True)
         return table
